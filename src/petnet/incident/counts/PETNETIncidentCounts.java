@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package petnet.incident.counts;
 
 import individuals.IndividualIncidents;
@@ -15,10 +10,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Iterator;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import locations.location;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -29,7 +22,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 public class PETNETIncidentCounts {
 
     private static String CSVOutputFile = "output.csv";
-
+    private static String CSVTotalCounts = "totalcounts.csv";
+    private static String XLSTotalCounts = "totalCounts.xlsx";
     /**
      * @param args the command line arguments
      */
@@ -37,10 +31,25 @@ public class PETNETIncidentCounts {
         if (!new File(CSVOutputFile).exists()) {
             initCSVOutput();
         }
-        testScan("MW 12-11-2017.xlsx");
+        location[] locations=new location[20];
+        locations=initializeLocations();
+        File folder = new File("C:/Users/Joe Licata/Documents/PETNET/Incident Reports Starting 12-1-2017/Emailed But Not Scanned");
+        File[] listOfFiles =folder.listFiles();
+        for(File file:listOfFiles){
+            if(file.isFile()){
+                scanNewIncidentReport(file.getAbsolutePath());
+            }
+        }
+        
+                
     }
 
-    public static void testScan(String filename) {
+    /**
+     * Scans in incident reports from Excel spreadsheets
+     * 
+     * @param filename
+     */
+    public static void scanNewIncidentReport(String filename) {
         try {
             FileInputStream file = new FileInputStream(new File(filename));
             Workbook wb = new XSSFWorkbook(file);
@@ -85,6 +94,11 @@ public class PETNETIncidentCounts {
         }
     }
 
+    /**
+     * Appends individual incidents to a CSV file.
+     * 
+     * @param incident
+     */
     public static void writeToCSVFile(IndividualIncidents incident) {
         try {
             PrintWriter pw = new PrintWriter(new BufferedWriter(new FileWriter(CSVOutputFile,true)));
@@ -109,6 +123,12 @@ public class PETNETIncidentCounts {
             sb.append(",");
             if(incident.getIncident().getControllable()){
                 sb.append("Controllable");
+            }else if(incident.getResponsibleParty().equals("PETNET")){
+                sb.append("PETNET Exception");
+            }else if(incident.getResponsibleParty().equals("Customer")){
+                sb.append("Customer Exception");
+            }else if (incident.getResponsibleParty().equals("Plane")){
+                sb.append("Plane Exception");
             }else sb.append("Uncontrollable");
             sb.append("\n");
             pw.write(sb.toString());
@@ -117,7 +137,10 @@ public class PETNETIncidentCounts {
         } catch (IOException ex) {
         }
     }
-
+    
+    /**
+     * Initialize the CSV file containing each individual incident.
+     */
     public static void initCSVOutput() {
         try {
             PrintWriter pw = new PrintWriter(new BufferedWriter(new FileWriter(CSVOutputFile,true)));
@@ -129,5 +152,50 @@ public class PETNETIncidentCounts {
         } catch (FileNotFoundException ex) {
         } catch (IOException ex) {
         }
+    }
+    
+    public static location[] initializeLocations(){
+        location[] location=new location[20];
+        try {
+            FileInputStream file = new FileInputStream(new File(XLSTotalCounts));
+            Workbook wb = new XSSFWorkbook(file);
+            Sheet sheet = wb.getSheetAt(0);
+            Iterator<Row> iterator = sheet.iterator();
+            String[][] input = new String[23][20];
+            int i=0,j;
+            while (iterator.hasNext()) {
+                Row currentRow = iterator.next();
+                Iterator<Cell> cells = currentRow.iterator();
+                j = 0;
+                while (cells.hasNext()) {
+                    Cell currentCell = cells.next();
+                    if (currentCell.getCellTypeEnum() == CellType.STRING) {
+                        input[i][j] = new DataFormatter().formatCellValue(currentCell);
+                    } else if (currentCell.getCellTypeEnum() == CellType.NUMERIC) {
+                        input[i][j] = String.valueOf(new DataFormatter().formatCellValue(currentCell));
+                    }
+                    j++;
+                }
+                i++;
+
+
+            }
+            
+            for(i=0;i<20;i++){
+                location[i]=new location();
+            }
+            for(i=1;i<20;i++){
+                String locationName = input[0][i];
+                int[] incidents = new int[21];
+                for (j=1;j<22;j++){
+                    incidents[j-1]=Integer.parseInt(input[j][i]);
+                }
+                location[i-1].init(locationName, incidents);
+            }
+            
+        } catch (FileNotFoundException ex) {
+        } catch (IOException ex) {
+        }
+        return location;
     }
 }
